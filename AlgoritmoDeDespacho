@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <h1>JUAN JOSE VILLA ALZATE</h1>
+    <h2>CODIGO: 1007656223</h2>
+    <title>Simulación de Algoritmos de Planificación</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        canvas {
+            width: 100%;
+            height: 400px;
+        }
+        .form-container, .gantt-container, .results {
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 10px;
+        }
+        .gantt-container {
+            position: relative;
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>Ingresar Datos de Procesos</h2>
+        <form id="processForm">
+            <div class="form-group">
+                <label for="processCount">Número de procesos:</label>
+                <input type="number" id="processCount" name="processCount" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="scheduler">Seleccionar método de planificación:</label>
+                <select id="scheduler" name="scheduler" required>
+                    <option value="fifo">FIFO</option>
+                    <option value="sjf">SJF</option>
+                    <option value="rr">Round Robin</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="quantum">Quantum (para Round Robin, 0 si no se usa):</label>
+                <input type="number" id="quantum" name="quantum" min="0" value="0">
+            </div>
+            <div id="processInputs"></div>
+            <button type="submit">Generar Diagrama de Gantt</button>
+        </form>
+    </div>
+
+    <div class="gantt-container">
+        <h2>Diagrama de Gantt</h2>
+        <canvas id="ganttChart"></canvas>
+    </div>
+
+    <div class="results">
+        <h3>Resultados</h3>
+        <p id="results"></p>
+    </div>
+
+    <script>
+        // Variables de referencia
+        const form = document.getElementById('processForm');
+        const processCountInput = document.getElementById('processCount');
+        const processInputsContainer = document.getElementById('processInputs');
+        const schedulerSelect = document.getElementById('scheduler');
+        const quantumInput = document.getElementById('quantum');
+
+        // Función para actualizar los campos de entrada de procesos
+        function updateProcessInputs() {
+            const processCount = parseInt(processCountInput.value);
+            processInputsContainer.innerHTML = '';
+
+            for (let i = 0; i < processCount; i++) {
+                processInputsContainer.innerHTML += `
+                    <div class="form-group">
+                        <label for="arrivalTime${i}">Tiempo de llegada del proceso ${i + 1}:</label>
+                        <input type="number" id="arrivalTime${i}" name="arrivalTime${i}" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="burstTime${i}">Ráfaga de CPU del proceso ${i + 1}:</label>
+                        <input type="number" id="burstTime${i}" name="burstTime${i}" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="priority${i}">Prioridad del proceso ${i + 1} (opcional):</label>
+                        <input type="number" id="priority${i}" name="priority${i}" min="0">
+                    </div>
+                `;
+            }
+        }
+
+        // Manejar el envío del formulario
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const processCount = parseInt(processCountInput.value);
+            const scheduler = schedulerSelect.value;
+            const quantum = parseInt(quantumInput.value) || 0;
+            const processInputs = [];
+
+            for (let i = 0; i < processCount; i++) {
+                const arrivalTime = parseInt(document.getElementById(`arrivalTime${i}`).value);
+                const burstTime = parseInt(document.getElementById(`burstTime${i}`).value);
+                const priority = parseInt(document.getElementById(`priority${i}`).value) || 0;
+
+                processInputs.push({ id: i + 1, arrivalTime, burstTime, priority });
+            }
+
+            generateGanttChart(processInputs, scheduler, quantum);
+        });
+
+        // Crear diagrama de Gantt con ejes invertidos
+function createGanttChart(ctx, data) {
+    const labels = [];
+    const datasets = [];
+    const processColors = [
+        'rgba(75, 192, 192, 0.5)',
+        'rgba(153, 102, 255, 0.5)',
+        'rgba(255, 159, 64, 0.5)',
+        'rgba(255, 99, 132, 0.5)',
+        'rgba(54, 162, 235, 0.5)'
+    ];
+
+    data.forEach((proc, index) => {
+        labels.push(`P${proc.id}`);
+        datasets.push({
+            label: `P${proc.id}`,
+            data: [{ x: [proc.startTime, proc.endTime], y: [index + 1, index + 1] }],
+            backgroundColor: processColors[index % processColors.length],
+            barThickness: 20 // Ajusta el grosor de las barras según sea necesario
+        });
+    });
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: datasets,
+        },
+        options: {
+            plugins: {
+                legend: { display: true },
+                tooltip: {
+                    callbacks: {
+                        label: (tooltipItem) => {
+                            const { dataset, raw } = tooltipItem;
+                            return `${dataset.label} - Inicio: ${raw.x[0]}, Fin: ${raw.x[1]}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    type: 'linear',
+                    position: 'bottom',
+                    title: {
+                        display: true,
+                        text: 'Tiempo'
+                    },
+                    ticks: {
+                        stepSize: 1,
+                        min: 0,
+                    }
+                },
+                y: {
+                    stacked: true,
+                    type: 'category',
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Procesos'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return labels[value];
+                        },
+                        beginAtZero: true
+                    }
+                }
+            },
+            responsive: true,
+            maintainAspectRatio: false,
+        }
+    });
+}
+
+
+        // Generar datos del diagrama de Gantt según el algoritmo de planificación
+        function generateGanttChart(processes, scheduler, quantum) {
+            const ctx = document.getElementById('ganttChart').getContext('2d');
+            let chartData;
+
+            switch (scheduler) {
+                case 'fifo':
+                    chartData = calculateFIFO(processes);
+                    break;
+                case 'sjf':
+                    chartData = calculateSJF(processes);
+                    break;
+                case 'rr':
+                    chartData = calculateRoundRobin(processes, quantum);
+                    break;
+            }
+
+            createGanttChart(ctx, chartData.processes);
+            document.getElementById('results').textContent = `TE: ${chartData.te.toFixed(2)}, TS: ${chartData.ts.toFixed(2)}`;
+        }
+
+        // Cálculo FIFO
+        function calculateFIFO(processes) {
+            const sortedProcesses = processes.slice().sort((a, b) => a.arrivalTime - b.arrivalTime);
+            let currentTime = 0;
+            const result = [];
+
+            sortedProcesses.forEach((proc) => {
+                const startTime = Math.max(currentTime, proc.arrivalTime);
+                const endTime = startTime + proc.burstTime;
+                result.push({ id: proc.id, startTime, endTime });
+                currentTime = endTime;
+            });
+
+            const totalWaitTime = result.reduce((acc, proc) => acc + (proc.startTime - processes.find(p => p.id === proc.id).arrivalTime), 0);
+            const totalTurnaroundTime = result.reduce((acc, proc) => acc + (proc.endTime - processes.find(p => p.id === proc.id).arrivalTime), 0);
+
+            return {
+                processes: result,
+                te: totalWaitTime / processes.length,
+                ts: totalTurnaroundTime / processes.length
+            };
+        }
+
+        // Cálculo SJF
+        function calculateSJF(processes) {
+            const sortedProcesses = processes.slice().sort((a, b) => a.burstTime - b.burstTime);
+            let currentTime = 0;
+            const result = [];
+
+            sortedProcesses.forEach((proc) => {
+                const startTime = Math.max(currentTime, proc.arrivalTime);
+                const endTime = startTime + proc.burstTime;
+                result.push({ id: proc.id, startTime, endTime });
+                currentTime = endTime;
+            });
+
+            const totalWaitTime = result.reduce((acc, proc) => acc + (proc.startTime - processes.find(p => p.id === proc.id).arrivalTime), 0);
+            const totalTurnaroundTime = result.reduce((acc, proc) => acc + (proc.endTime - processes.find(p => p.id === proc.id).arrivalTime), 0);
+
+            return {
+                processes: result,
+                te: totalWaitTime / processes.length,
+                ts: totalTurnaroundTime / processes.length
+            };
+        }
+
+        // Cálculo Round Robin
+        function calculateRoundRobin(processes, quantum) {
+            const processesQueue = processes.slice();
+            let currentTime = 0;
+            const result = [];
+            const waitTimes = {};
+            const turnaroundTimes = {};
+
+            while (processesQueue.length > 0) {
+                const proc = processesQueue.shift();
+                const burstTime = Math.min(proc.burstTime, quantum);
+                const startTime = Math.max(currentTime, proc.arrivalTime);
+                const endTime = startTime + burstTime;
+
+                result.push({ id: proc.id, startTime, endTime });
+                currentTime = endTime;
+
+                if (!waitTimes[proc.id]) {
+                    waitTimes[proc.id] = startTime - proc.arrivalTime;
+                } else {
+                    waitTimes[proc.id] += (endTime - proc.arrivalTime) - proc.burstTime;
+                }
+                turnaroundTimes[proc.id] = endTime - proc.arrivalTime;
+
+                if (proc.burstTime > quantum) {
+                    processesQueue.push({
+                        ...proc,
+                        burstTime: proc.burstTime - quantum,
+                    });
+                }
+            }
+
+            const totalWaitTime = Object.values(waitTimes).reduce((a, b) => a + b, 0);
+            const totalTurnaroundTime = Object.values(turnaroundTimes).reduce((a, b) => a + b, 0);
+
+            return {
+                processes: result,
+                te: totalWaitTime / processes.length,
+                ts: totalTurnaroundTime / processes.length
+            };
+        }
+
+        // Evento de entrada para actualizar los campos de procesos
+        processCountInput.addEventListener('input', updateProcessInputs);
+    </script>
+</body>
+</html>
